@@ -1,0 +1,2569 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Кирка Бесконечности — Шахта Ставок</title>
+<!-- Telegram Mini Apps SDK -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    margin: 0;
+    padding: 0;
+  }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #141418;
+    font-family: 'Courier New', Courier, monospace;
+    touch-action: none;
+    color: #fff;
+  }
+  canvas#game {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+
+  /* HUD во время спуска */
+  #hud-top {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .hud-col {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .hud-col.right {
+    align-items: flex-end;
+  }
+  .pill {
+    background: rgba(12, 13, 20, 0.88);
+    border: 2px solid #4a4e69;
+    border-radius: 6px;
+    padding: 5px 10px;
+    color: #fff;
+    font-weight: bold;
+    font-size: 13px;
+    text-shadow: 2px 2px 0 #000;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+  }
+  .pill.money {
+    border-color: #ffd166;
+    color: #ffd166;
+  }
+  .pill.win {
+    border-color: #06d6a0;
+    color: #06d6a0;
+  }
+  .pill.loss {
+    border-color: #ff595e;
+    color: #ff8fa3;
+  }
+  .pill.deepslate {
+    border-color: #7b7b94;
+    background: rgba(24, 24, 34, 0.94);
+    color: #c7c7e2;
+  }
+
+  #giant-bar-wrap {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 165px;
+    background: rgba(0, 0, 0, 0.85);
+    border: 2px solid #c77dff;
+    border-radius: 8px;
+    padding: 4px 6px;
+    display: none;
+    z-index: 12;
+    text-align: center;
+    pointer-events: none;
+  }
+  #giant-bar-text {
+    font-size: 11px;
+    font-weight: 900;
+    color: #e0aaff;
+    text-shadow: 1px 1px 0 #000;
+    margin-bottom: 3px;
+  }
+  #giant-bar-fill {
+    height: 7px;
+    background: linear-gradient(90deg, #9d4edd, #00f5d4);
+    border-radius: 4px;
+    width: 100%;
+  }
+
+  /* Кнопки скорости и паузы в углу */
+  #corner-controls {
+    position: absolute;
+    bottom: 38px;
+    left: 12px;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    z-index: 16;
+  }
+  .ctrl-btn {
+    background: rgba(18, 20, 30, 0.92);
+    border: 2px solid #5c627c;
+    border-radius: 7px;
+    padding: 7px 10px;
+    color: #e9ecef;
+    font-family: inherit;
+    font-weight: 900;
+    font-size: 13px;
+    cursor: pointer;
+    text-shadow: 1px 1px 0 #000;
+    box-shadow: 0 3px 0 #0b0c12;
+  }
+  .ctrl-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 #0b0c12;
+  }
+  .ctrl-btn.active {
+    background: #ffd166;
+    border-color: #fff;
+    color: #000;
+    text-shadow: none;
+  }
+  .ctrl-btn.pause {
+    border-color: #adb5bd;
+    padding: 7px 11px;
+  }
+
+  #hint {
+    position: absolute;
+    bottom: 14px;
+    left: 12px;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 12px;
+    font-weight: bold;
+    text-shadow: 2px 2px 0 #000;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  #toast {
+    position: absolute;
+    top: 21%;
+    left: 50%;
+    transform: translateX(-50%) scale(0.9);
+    background: rgba(10, 10, 15, 0.94);
+    border: 3px solid #ffd166;
+    color: #ffd166;
+    padding: 9px 16px;
+    border-radius: 10px;
+    font-weight: 900;
+    font-size: 16px;
+    text-shadow: 2px 2px 0 #000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 25;
+    text-align: center;
+    max-width: 92%;
+  }
+  #toast.show {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+
+  /* Модалки (Лобби / Рулетка / Пауза / Итог) */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(8, 9, 14, 0.76);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 30;
+  }
+  .overlay.active {
+    display: flex;
+  }
+  .panel {
+    background: #1c1e2a;
+    border: 4px solid #6c757d;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 390px;
+    padding: 18px;
+    text-align: center;
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.92);
+  }
+  .panel-title {
+    font-size: 21px;
+    font-weight: 900;
+    color: #ffd166;
+    text-shadow: 2px 2px 0 #000;
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
+  }
+  .balance-box {
+    background: #12131c;
+    border: 2px solid #ffd166;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 900;
+  }
+  .balance-val {
+    color: #ffd166;
+    font-size: 18px;
+  }
+
+  .bet-label {
+    font-size: 12px;
+    color: #adb5bd;
+    text-align: left;
+    margin-bottom: 6px;
+    font-weight: bold;
+  }
+  .bet-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+  .bet-chip {
+    background: #2b2d42;
+    border: 2px solid #5c627c;
+    border-radius: 6px;
+    padding: 7px 2px;
+    color: #fff;
+    font-weight: 900;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .bet-chip.selected {
+    background: #ffd166;
+    color: #000;
+    border-color: #fff;
+  }
+  .bet-custom-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #12131c;
+    border: 2px solid #4a4e69;
+    border-radius: 8px;
+    padding: 5px 8px;
+    margin-bottom: 12px;
+  }
+  .bet-step {
+    background: #3a3d56;
+    border: 1px solid #8d99ae;
+    color: #fff;
+    font-weight: 900;
+    font-size: 15px;
+    width: 34px;
+    height: 30px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  #bet-display {
+    font-size: 18px;
+    font-weight: 900;
+    color: #06d6a0;
+  }
+
+  .odds-box {
+    background: #12131c;
+    border: 2px solid #343a40;
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 12px;
+    font-size: 11px;
+    text-align: left;
+    color: #ced4da;
+    line-height: 1.5;
+  }
+  .odds-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 10px;
+  }
+
+  .btn-main {
+    width: 100%;
+    padding: 13px;
+    font-size: 16px;
+    font-weight: 900;
+    background: linear-gradient(180deg, #06d6a0, #059c74);
+    color: #000;
+    border: 3px solid #fff;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #035c44;
+  }
+  .btn-main:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 #035c44;
+  }
+  .btn-main:disabled {
+    background: #555;
+    color: #999;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+  .btn-free {
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 900;
+    background: linear-gradient(180deg, #ffb703, #fb8500);
+    color: #000;
+    border: 2px solid #fff;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .btn-danger {
+    width: 100%;
+    margin-top: 10px;
+    padding: 11px;
+    font-size: 14px;
+    font-weight: 900;
+    background: linear-gradient(180deg, #ef476f, #b5173e);
+    color: #fff;
+    border: 2px solid #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    text-shadow: 1px 1px 0 #000;
+  }
+
+  /* Рулетка выпадения кирки */
+  #roulette-box {
+    background: #12131c;
+    border: 4px solid #ffd166;
+    border-radius: 14px;
+    padding: 20px;
+    width: 100%;
+    max-width: 320px;
+    text-align: center;
+  }
+  #roulette-icon {
+    width: 96px;
+    height: 96px;
+    margin: 12px auto;
+    image-rendering: pixelated;
+    display: block;
+    background: #1c1e2a;
+    border: 3px solid #555;
+    border-radius: 12px;
+    padding: 10px;
+  }
+  #roulette-name {
+    font-size: 20px;
+    font-weight: 900;
+    margin-bottom: 4px;
+    text-shadow: 2px 2px 0 #000;
+  }
+  #roulette-stats {
+    font-size: 13px;
+    color: #adb5bd;
+  }
+
+  /* Итог раунда */
+  .stat-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 10px;
+    background: #12131c;
+    border-radius: 6px;
+    margin-bottom: 5px;
+    font-size: 13px;
+  }
+  .profit-banner {
+    font-size: 22px;
+    font-weight: 900;
+    padding: 8px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 0 #000;
+  }
+  .profit-banner.plus {
+    background: rgba(6, 214, 160, 0.18);
+    border: 2px solid #06d6a0;
+    color: #06d6a0;
+  }
+  .profit-banner.minus {
+    background: rgba(255, 89, 94, 0.18);
+    border: 2px solid #ff595e;
+    color: #ff595e;
+  }
+</style>
+</head>
+<body>
+
+<div id="hud-top">
+  <div class="hud-col">
+    <div class="pill" id="tier-pill">⛏️ Ожидание ставки</div>
+    <div class="pill">❤️ <span id="hp-val">-</span></div>
+    <div class="pill" id="depth-pill">⬇️ Глубина: <span id="depth-val">0</span>м</div>
+  </div>
+  <div class="hud-col right">
+    <div class="pill money">💼 <span id="bal-hud">100.00</span> ₽</div>
+    <div class="pill" id="earned-pill">💰 Копилка: <span id="earned-hud">0.00</span> ₽</div>
+    <div class="pill" id="bet-hud-pill" style="font-size:11px;color:#adb5bd;">Ставка: <span id="bet-hud">10</span> ₽</div>
+  </div>
+</div>
+
+<div id="giant-bar-wrap">
+  <div id="giant-bar-text">⚡ РАЗМЕР 3×3</div>
+  <div id="giant-bar-fill"></div>
+</div>
+
+<div id="toast">ВЕРСТАК!</div>
+
+<div id="corner-controls">
+  <button class="ctrl-btn active" id="spd-1" onclick="setGameSpeed(1)">×1</button>
+  <button class="ctrl-btn" id="spd-2" onclick="setGameSpeed(2)">×2</button>
+  <button class="ctrl-btn" id="spd-3" onclick="setGameSpeed(3)">×3</button>
+  <button class="ctrl-btn pause" onclick="togglePause()" title="Пауза (ESC)">⏸</button>
+</div>
+
+<div id="hint">Тап / A-D: влево-вправо | ESC: пауза</div>
+
+<canvas id="game"></canvas>
+
+<!-- ЛОББИ СТАВОК -->
+<div class="overlay active" id="lobby-overlay">
+  <div class="panel">
+    <div class="panel-title">⛏️ КИРКА БЕСКОНЕЧНОСТИ</div>
+    <div class="balance-box">
+      <span>ТВОЙ БАНК:</span>
+      <span class="balance-val"><span id="lobby-balance">100.00</span> ₽</span>
+    </div>
+
+    <div class="bet-label">ВЫБЕРИ СТАВКУ НА СПУСК:</div>
+    <div class="bet-grid">
+      <button class="bet-chip selected" onclick="selectBet(10, this)">10</button>
+      <button class="bet-chip" onclick="selectBet(25, this)">25</button>
+      <button class="bet-chip" onclick="selectBet(50, this)">50</button>
+      <button class="bet-chip" onclick="selectBet(100, this)">100</button>
+      <button class="bet-chip" onclick="selectBet('all', this)">ALL</button>
+    </div>
+
+    <div class="bet-custom-row">
+      <button class="bet-step" onclick="stepBet(-5)">-5</button>
+      <span id="bet-display">10 ₽</span>
+      <button class="bet-step" onclick="stepBet(5)">+5</button>
+    </div>
+
+    <div class="odds-box">
+      <div style="color:#ffd166;font-weight:bold;margin-bottom:3px;">🎲 ШАНСЫ ВЫПАДЕНИЯ КИРКИ:</div>
+      <div class="odds-grid">
+        <span>🟫 Дерево (100 HP): <b>48%</b></span>
+        <span>⬜ Камень (200 HP): <b>27%</b></span>
+        <span>🟧 Медь (350 HP): <b>14%</b></span>
+        <span>⚪ Железо (500 HP): <b>7%</b></span>
+        <span>🟨 Золото (0.25с): <b>3%</b></span>
+        <span>💎 Алмаз (700 HP): <b>1%</b></span>
+      </div>
+      <div style="margin-top:5px;border-top:1px solid #333;padding-top:4px;color:#adb5bd;">
+        Выплаты: <b>Медь</b> 0.03x | <b>Железо</b> 0.12x | <b>Золото</b> 0.22x | <b style="color:#5ef2e6;">Алмаз 0.45x</b><br>
+        💚 <b style="color:#54e884;">Изумруд:</b> пружинит, но даёт <b>×3 к копилке!</b><br>
+        🧰 <b>Сундук:</b> +10 ₽ | 🪵 <b>Верстак:</b> апгрейд кирки<br>
+        🌑 <b>150м+:</b> глубинный сланец и сланцевые руды (прочность ×1.7)
+      </div>
+    </div>
+
+    <button class="btn-main" id="btn-spin" onclick="startSpin()">🎲 СТАВИТЬ И КОПАТЬ</button>
+    <button class="btn-free" id="btn-free-money" onclick="freeTopUp()" style="display:none;">🎁 ПОПОЛНИТЬ БАНК (+100 ₽)</button>
+  </div>
+</div>
+
+<!-- РУЛЕТКА ВЫПАДЕНИЯ КИРКИ -->
+<div class="overlay" id="roulette-overlay">
+  <div id="roulette-box">
+    <div style="font-size:14px;font-weight:900;color:#ffd166;">КРУТИМ КИРКУ...</div>
+    <canvas id="roulette-icon" width="16" height="16"></canvas>
+    <div id="roulette-name">...</div>
+    <div id="roulette-stats">...</div>
+  </div>
+</div>
+
+<!-- ПАУЗА (ESC) -->
+<div class="overlay" id="pause-overlay">
+  <div class="panel" style="max-width:330px;">
+    <div class="panel-title">⏸ ПАУЗА</div>
+    <div class="stat-line"><span>Текущая глубина:</span><strong id="pause-depth">0м</strong></div>
+    <div class="stat-line"><span>В копилке:</span><strong id="pause-earned" style="color:#06d6a0;">0.00 ₽</strong></div>
+    <div class="stat-line"><span>Кирка:</span><strong id="pause-pick">-</strong></div>
+    <button class="btn-main" style="margin-top:12px;" onclick="togglePause()">▶ ПРОДОЛЖИТЬ (ESC)</button>
+    <button class="btn-danger" onclick="quitFromPause()">🏁 ЗАВЕРШИТЬ СПУСК</button>
+  </div>
+</div>
+
+<!-- ИТОГИ СПУСКА -->
+<div class="overlay" id="result-overlay">
+  <div class="panel">
+    <div class="panel-title">КИРКА СЛОМАЛАСЬ!</div>
+    <div class="profit-banner" id="res-profit-banner">+0.00 ₽</div>
+    <div class="stat-line"><span>Ставка / Выпала:</span><strong id="res-bet-pick">-</strong></div>
+    <div class="stat-line"><span>Финальная кирка:</span><strong id="res-final-pick">-</strong></div>
+    <div class="stat-line"><span>Итого в копилке:</span><strong id="res-earned" style="color:#06d6a0;">0.00 ₽</strong></div>
+    <div class="stat-line"><span>Медь / Железо / Золото:</span><strong id="res-ores-1">0 / 0 / 0</strong></div>
+    <div class="stat-line"><span>Алмазы / Изумруды / Сундуки:</span><strong id="res-ores-2">0 / 0 / 0</strong></div>
+    <div class="stat-line"><span>Макс. глубина:</span><strong id="res-depth">0м</strong></div>
+    <button class="btn-main" style="margin-top:10px;" onclick="backToLobby()">СДЕЛАТЬ НОВУЮ СТАВКУ ▶</button>
+  </div>
+</div>
+
+<script>
+// ================= TELEGRAM MINI APP INIT =================
+const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  if (typeof tg.disableVerticalSwipes === 'function') {
+    tg.disableVerticalSwipes();
+  }
+  try {
+    tg.setHeaderColor('#141418');
+    tg.setBackgroundColor('#141418');
+  } catch (e) {}
+}
+
+// ================= SOUND SYNTHESIZER =================
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+let isMuted = false;
+document.addEventListener('visibilitychange', () => { isMuted = document.hidden; });
+
+function playSound(type) {
+  if (isMuted) return;
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  const now = audioCtx.currentTime;
+
+  if (type === 'tick') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(520 + Math.random() * 140, now);
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+    osc.start(now); osc.stop(now + 0.035);
+  } else if (type === 'hit') {
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(160 + Math.random() * 45, now);
+    osc.frequency.exponentialRampToValueAtTime(75, now + 0.04);
+    gain.gain.setValueAtTime(0.05, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    osc.start(now); osc.stop(now + 0.04);
+  } else if (type === 'deepslate_hit') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(115 + Math.random() * 25, now);
+    osc.frequency.exponentialRampToValueAtTime(52, now + 0.05);
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    osc.start(now); osc.stop(now + 0.05);
+  } else if (type === 'break') {
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(135 + Math.random() * 30, now);
+    osc.frequency.exponentialRampToValueAtTime(45, now + 0.075);
+    gain.gain.setValueAtTime(0.095, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+    osc.start(now); osc.stop(now + 0.075);
+  } else if (type === 'deepslate_break') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(98 + Math.random() * 20, now);
+    osc.frequency.exponentialRampToValueAtTime(34, now + 0.09);
+    gain.gain.setValueAtTime(0.11, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    osc.start(now); osc.stop(now + 0.09);
+  } else if (type === 'ore') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(380, now);
+    osc.frequency.exponentialRampToValueAtTime(720, now + 0.11);
+    gain.gain.setValueAtTime(0.14, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+    osc.start(now); osc.stop(now + 0.11);
+  } else if (type === 'diamond') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(660, now);
+    osc.frequency.setValueAtTime(880, now + 0.06);
+    osc.frequency.setValueAtTime(1180, now + 0.12);
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+    osc.start(now); osc.stop(now + 0.28);
+  } else if (type === 'emerald_bounce') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(260, now);
+    osc.frequency.exponentialRampToValueAtTime(820, now + 0.14);
+    gain.gain.setValueAtTime(0.17, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+    osc.start(now); osc.stop(now + 0.14);
+  } else if (type === 'emerald_win') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(523, now);
+    osc.frequency.setValueAtTime(659, now + 0.07);
+    osc.frequency.setValueAtTime(784, now + 0.14);
+    osc.frequency.setValueAtTime(1046, now + 0.21);
+    osc.frequency.setValueAtTime(1318, now + 0.29);
+    gain.gain.setValueAtTime(0.24, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+    osc.start(now); osc.stop(now + 0.55);
+  } else if (type === 'chest') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(587, now);
+    osc.frequency.setValueAtTime(880, now + 0.08);
+    gain.gain.setValueAtTime(0.19, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+    osc.start(now); osc.stop(now + 0.26);
+  } else if (type === 'slime') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(175, now);
+    osc.frequency.exponentialRampToValueAtTime(520, now + 0.16);
+    gain.gain.setValueAtTime(0.17, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+    osc.start(now); osc.stop(now + 0.16);
+  } else if (type === 'bedrock') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(92, now);
+    osc.frequency.exponentialRampToValueAtTime(45, now + 0.065);
+    gain.gain.setValueAtTime(0.085, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+    osc.start(now); osc.stop(now + 0.065);
+  } else if (type === 'tnt') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(125, now);
+    osc.frequency.exponentialRampToValueAtTime(22, now + 0.42);
+    gain.gain.setValueAtTime(0.28, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+    osc.start(now); osc.stop(now + 0.42);
+  } else if (type === 'upgrade') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(440, now);
+    osc.frequency.setValueAtTime(554, now + 0.07);
+    osc.frequency.setValueAtTime(659, now + 0.14);
+    osc.frequency.setValueAtTime(880, now + 0.21);
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+    osc.start(now); osc.stop(now + 0.38);
+  }
+}
+
+// ================= EXACT 16x16 PIXEL SPRITES =================
+function buildSprite(rows, palette) {
+  const h = rows.length;
+  const w = rows[0].length;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d');
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const ch = rows[y][x];
+      if (ch === '.' || !palette[ch]) continue;
+      g.fillStyle = palette[ch];
+      g.fillRect(x, y, 1, 1);
+    }
+  }
+  return c;
+}
+
+const TEX = {};
+
+// 1. Камень
+TEX.stone = buildSprite([
+  "ccbbbdccbbbbbccc",
+  "bcadddccbbddddcb",
+  "cdcbcbdccbbabbbc",
+  "bbbbbbbcdcbabccd",
+  "bdddddbbbbbbbcdc",
+  "bbbbbcbacbbcccbc",
+  "addddbbccddbccdd",
+  "ccbbbbabbbbbbbcb",
+  "dddddddcccbdbdcc",
+  "cdbbbbcbabbbbbbc",
+  "cccdddcbacddccdc",
+  "bddcccdbbccbbcca",
+  "cbccbbddbbbbbbbc",
+  "ccbbbabbbbdddddd",
+  "cbbddcbccbbbbccb",
+  "ccbbbbbccddabbbc"
+], { a: '#686868', b: '#747474', c: '#7f7f7f', d: '#8f8f8f' });
+
+// 2. Уголь
+TEX.coal = buildSprite([
+  "ccbbbdccbbbbbccc",
+  "bcaddd333bddddcb",
+  "cdcbcb1211bb11bc",
+  "bbbbb112211abccd",
+  "b11ddb3111bbbcdc",
+  "bbbbbcbacbb33cbc",
+  "addddbbccd121cdd",
+  "ccbb111bbb112bcb",
+  "ddd12211ccbdbdcc",
+  "cdbb111babbbbbbc",
+  "cccdddcbacdd312c",
+  "bd33ccdbb33bbcca",
+  "cb122111bb121bbc",
+  "ccb121bbbb111ddd",
+  "cbbddcb11bbbbccb",
+  "ccbbbbbccddabbbc"
+], { a: '#686868', b: '#747474', c: '#7f7f7f', d: '#8f8f8f', '3': '#545454', '1': '#222222', '2': '#383d2c' });
+
+// 3. Медная руда
+TEX.copper = buildSprite([
+  "ccbbbdccbbbbbccc",
+  "bcadddccbbddddcb",
+  "cdggcbdccbboubbc",
+  "bbbbbggecbbooccd",
+  "bdddgmoombbbbcdc",
+  "bbbbbooobbbmmcbc",
+  "addddbbccgGmmcdd",
+  "ccbbbbabbgGGoucb",
+  "ddgGmmbccmggoocc",
+  "cGGeembbaagmmbbc",
+  "ccggddcbacddccdc",
+  "bddcccdboobbbcca",
+  "cbccbbmmooubbbbc",
+  "ccggbabmmgbbggdd",
+  "cbggdcbggbbbbGcb",
+  "ccbbbbbccddabbbc"
+], {
+  a: '#686868', b: '#747474', c: '#7f7f7f', d: '#8f8f8f',
+  g: '#2f6e5b', G: '#4db896', e: '#58cca6',
+  m: '#7d754c', o: '#d96c43', u: '#f2875e'
+});
+
+// 4. Железная руда
+TEX.iron = buildSprite([
+  "ccbbbdccbbzzzzcc",
+  "bczzzdccbbbzydcb",
+  "czxycbdccbbabbbc",
+  "bbbbbbbzzzzbbccd",
+  "bdddzyxxwxybbzyd",
+  "bbbbbbbyxxbbbbbc",
+  "addddbbccddbccdd",
+  "ccbzydbbbzzzbccb",
+  "ddzxyxxbbzyxbdcc",
+  "cdbbxwbbabbbbbbc",
+  "cccdddcbacczzddc",
+  "bdcczydbzzxwwzya",
+  "czydbbddbbyxxwbc",
+  "cczybabbbbdddddd",
+  "cbbddcbccbbbbccb",
+  "ccbbbbbccddabbbc"
+], { a: '#686868', b: '#747474', c: '#7f7f7f', d: '#8f8f8f', z: '#80694b', y: '#ad8a6d', x: '#d6ae92', w: '#e5c6b0' });
+
+// 5. Золотая руда
+TEX.gold = buildSprite([
+  "ccbbbdccbbbbbccc",
+  "bcabodccbbddddcb",
+  "cdcbcbdocbbboobc",
+  "bbbbbbgGGbbogocd",
+  "bddddgGGggbGggdc",
+  "bbbbGGYYWgbggcbc",
+  "addddGYWWGdbccdd",
+  "ccbbbbbGGgbbogcb",
+  "ddogdbbbgbboobcc",
+  "cdgGbbcbabbgGbbc",
+  "ccgYddcbacggGGdc",
+  "bddcccdbbgGGYWca",
+  "cbogooobbgGYWWbc",
+  "ccoGYYGbggGYGGdd",
+  "cbbgGYGccbgGGcob",
+  "ccbbbbbccddabogc"
+], {
+  a: '#686868', b: '#747474', c: '#7f7f7f', d: '#8f8f8f',
+  o: '#9e6e15', g: '#d98a10', G: '#f2b118', Y: '#ffdf33', W: '#fff799'
+});
+
+// 6. Алмазная руда
+TEX.diamond = buildSprite([
+  "ccbbbdccbbbbbccc",
+  "bcadddccbbddddcb",
+  "cdcbqbdccbbbmbbc",
+  "bbbbqbbqQbbbmccd",
+  "bddddbbqQbbbbcdc",
+  "bbbbbWQQQbmQQcbc",
+  "addWWQQQqbQqqcdd",
+  "ccbbmqqqbbqmmbcb",
+  "dqQddddcWQQbdbcc",
+  "cQqmbbcbQqqbbbbc",
+  "ccmmqdcbaqmmccdc",
+  "bddcqcdbbccQmbca",
+  "cbccbbddQQQqqQbc",
+  "ccbmqabbbQqqQqdd",
+  "cbbqmcbccbbmqqcb",
+  "ccbbbbbccddabbbc"
+], {
+  a: '#686868', b: '#747474', c: '#7f7f7f', d: '#8f8f8f',
+  m: '#6b9499', q: '#1cd4d4', Q: '#73f2e8', W: '#d4fffe'
+});
+
+// --- ГЛУБИННЫЙ СЛАНЕЦ И СЛАНЦЕВЫЕ РУДЫ (150м+) ---
+const DS_PAL = { '0': '#2a2a30', a: '#3b3b42', b: '#4c4c54', c: '#5d5d66', d: '#71717b' };
+
+TEX.deepslate = buildSprite([
+  "ccbbbaabccddccbb",
+  "bbbaaaabbccbbbaa",
+  "ddddccbb0000bbba",
+  "bbccbbbaaaabccdd",
+  "aaabbbcccddccbbb",
+  "ccbb000bbbaaaabb",
+  "ddccbbbaabbccddc",
+  "bbbaaaabccbb00bb",
+  "ccddccbbbaaabbbc",
+  "000bbbaabccddccb",
+  "bbccbbbaaaabb00b",
+  "aaabccddccbbbaaa",
+  "ccbbbaaaabbbccdd",
+  "bb000bbccbbbaaaa",
+  "ddccbbbaaaabbccb",
+  "bbbaabccddccbbba"
+], DS_PAL);
+
+TEX.deepslate_cobble = buildSprite([
+  "0abccba00abbba0a",
+  "acdddca0abcccba0",
+  "0abbbba00abbaa0a",
+  "0000000a0000000b",
+  "abbcba0abccba0ab",
+  "bcddca0acddca0ac",
+  "abbbba00abbba00a",
+  "0000000000000000",
+  "0abb0abccba0abba",
+  "abcb0acddca0acca",
+  "abbb0abbbba0abba",
+  "0000000000000000",
+  "abccba0abbba0abc",
+  "acddca0accca0acd",
+  "abbbba0abbba0abb",
+  "0000000000000000"
+], DS_PAL);
+
+TEX.ds_coal = buildSprite([
+  "ccbbbaabccddccbb",
+  "bbb111abbccbbbaa",
+  "dd1211bb0011bbba",
+  "bb1121baaa121cdd",
+  "aaab11cccdd11bbb",
+  "ccbb000bbbaaaabb",
+  "ddcc111aabb121dc",
+  "bbb1221bcc1121bb",
+  "ccdd11bbbaa11bbc",
+  "000bbbaabccddccb",
+  "bb11bbbaaaabb00b",
+  "a1211cddcc111aaa",
+  "cc111aaaab1221dd",
+  "bb000bbccb111aaa",
+  "ddccbbbaaaabbccb",
+  "bbbaabccddccbbba"
+], { ...DS_PAL, '1': '#141418', '2': '#262922' });
+
+TEX.ds_copper = buildSprite([
+  "ccbbbaabccddccbb",
+  "bbbaaaabbcc00baa",
+  "ddggccbb000oubba",
+  "bbccgggaaaabccdd",
+  "aaabgmoombdccbbb",
+  "ccbmmooubba00abb",
+  "ddccbbbaab0mmddc",
+  "bb000aabgGmmobbb",
+  "ccdgGmbbggGmoocc",
+  "0GGeembbbgGmmccb",
+  "bbgGbbbaaaabb00b",
+  "aaabccdoobbbbaaa",
+  "ccbbbgmooubbccdd",
+  "bbgGmbbgGbb0gGaa",
+  "ddccbbbaaaabbccb",
+  "bbbaabccddccbbba"
+], {
+  ...DS_PAL,
+  g: '#2b6b57', G: '#46b891', e: '#5cd6ab',
+  m: '#75734a', o: '#d96b42', u: '#f2885e'
+});
+
+TEX.ds_iron = buildSprite([
+  "ccbbbaabcczzzcbb",
+  "b000aaabbzyxybaa",
+  "dzyxycbb0000bbba",
+  "bzyxbbbaaaabccdd",
+  "aaabbbzyyxyccbbb",
+  "ccbbzyxxwxybaabb",
+  "ddccbbxxxybccddc",
+  "bb000aabccbb00bb",
+  "cczyxbbbaaabzyxc",
+  "00zxyxyabcczyycb",
+  "bbccxxybaaabb00b",
+  "aaabccddzyyxbaaa",
+  "ccbbbaazxyxwycdd",
+  "bzyx0bbcczyxbaaa",
+  "ddccbbbaaaabbccb",
+  "bbbaabccddccbbba"
+], { ...DS_PAL, z: '#786048', y: '#a68468', x: '#d6ae8e', w: '#ebd0ba' });
+
+TEX.ds_gold = buildSprite([
+  "ccbbbaabccddccbb",
+  "bb00aaabbcc00baa",
+  "ddggccbb000WYbba",
+  "bbcccggaaaabccdd",
+  "aaabbgYWYgbccbbb",
+  "ccbgYYWYbba00abb",
+  "ddccbbbaab0GGddc",
+  "bb000aabgGGYGGbb",
+  "ccgGYcbbbgGYWWYc",
+  "0gGYYGgbbaagGYcb",
+  "bbgGbbbaaaabb00b",
+  "aaabccgYgccbbaaa",
+  "ccbbbgGYWYGgccdd",
+  "bbgG0bbgGG00gGaa",
+  "ddccbbbaaaabbccb",
+  "bbbaabccddccbbba"
+], {
+  ...DS_PAL,
+  g: '#b56c08', G: '#e89c14', Y: '#ffd92b', W: '#fff9b0'
+});
+
+TEX.ds_diamond = buildSprite([
+  "ccbbbaabccddccbb",
+  "bbb0aaabbccbbbaa",
+  "ddcbqbbb000bQmb0",
+  "bbcbmbbaQqbmmcdd",
+  "aaabbbmqqmbccbbb",
+  "ccbbWWQQbbWWQabb",
+  "ddmWWqqqmbqqmddc",
+  "bbmmqqmbbmqq00bb",
+  "ccQqqbbaWQQmbbbc",
+  "00mqqbaamqqmdccb",
+  "bbccqbbmqqqbb00b",
+  "aaabccddccQqqaaa",
+  "ccbbQqqaaQWWqQdd",
+  "bb0mqqmbbmqqmaaa",
+  "ddccbbbaaaabbccb",
+  "bbbaabccddccbbba"
+], {
+  ...DS_PAL,
+  m: '#4e7c82', q: '#16cfd6', Q: '#7cf7ea', W: '#e0ffff'
+});
+
+// 7. Изумрудный блок
+TEX.emerald = buildSprite([
+  "mmmmmmmmmmmmmmmd",
+  "mLLLLLLlLLLLlLld",
+  "mLddddddddddddLd",
+  "mLdLLLllLLllLdLd",
+  "mLdLdmmmmmmLdLld",
+  "mLdLdmLLLLdmLdLd",
+  "mLlLdmLmmLdmLdLd",
+  "mLdLdmLmmlmmLdld",
+  "mLdLdmLmmlmdLdLd",
+  "mLdLdmLLmmdmLdLd",
+  "mLdLdmdmmdmmLdLd",
+  "mLlLdmmddmmmLdLd",
+  "mLdLllLLlLLlLdLd",
+  "mLddddddddddddLd",
+  "mllLLlLLLLlLLlmd",
+  "dddddddddddddddk"
+], {
+  k: '#09732c', d: '#0e963b', m: '#1cc454', l: '#42e078', L: '#7df5a5'
+});
+
+// 8. Сундук (+10 монет)
+TEX.chest = buildSprite([
+  "kkkkkkkkkkkkkkkk",
+  "kbbmbbmmbbmbbmbk",
+  "kmbmmbmmbmmbmmbk",
+  "kbbmmbdWWdbmmbbk",
+  "kmmbbbdWSdbbbmmk",
+  "kddddddWSddddddk",
+  "kbbmmbdSSdbmmbbk",
+  "kmmbmmbdddmbmmbk",
+  "kbbmbbmmbbmbbmbk",
+  "kmbmmbmmbmmbmmbk",
+  "kbbmbbmmbbmbbmbk",
+  "kmmbmmbbmmbmmbbk",
+  "kbbmbbmmbbmbbmbk",
+  "kmbmmbmmbmmbmmbk",
+  "kbbbbmmmmbbbbmbk",
+  "kkkkkkkkkkkkkkkk"
+], {
+  k: '#2c241b', d: '#4f3514', b: '#9c6c24', m: '#ad7a2c', W: '#e2e4e8', S: '#989ca3'
+});
+
+// 9. Бедрок
+TEX.bedrock = buildSprite([
+  "2111114403321113",
+  "2244444424440221",
+  "2011011141222422",
+  "2422202422111112",
+  "2441111111444440",
+  "1122211120221102",
+  "4423214422224440",
+  "2221111110111122",
+  "2440412224444444",
+  "2111111103211142",
+  "2242244202444222",
+  "0222122144221440",
+  "2111111144111112",
+  "2414022122012244",
+  "2221111122442112",
+  "2222044222211122"
+], { '0': '#050505', '1': '#363636', '2': '#555555', '3': '#6e6e6e', '4': '#9a9a9a' });
+
+// 10. TNT
+TEX.tnt = buildSprite([
+  "1232123212321232",
+  "1232123212321232",
+  "1232123212321232",
+  "1232123212321232",
+  "0121012101210121",
+  "wwwwwwgwwwwwgwww",
+  "wwkkkwkwwkwkkkwg",
+  "wwwkwwkkwkwwkwww",
+  "gwwkwwkwkkwwkwgg",
+  "gggkggkggkggkggg",
+  "gggggggggggggggg",
+  "0121012101210121",
+  "1232123212321232",
+  "1232123212321232",
+  "1232123212321232",
+  "0121012101210121"
+], {
+  '0': '#8c2210', '1': '#b82e14', '2': '#d93b18', '3': '#f05224',
+  w: '#dcdcdc', g: '#b8b8b8', k: '#0a0a0a'
+});
+
+// 11. Верстак
+TEX.craft = buildSprite([
+  "klllrrkkrrlllllk",
+  "kLLmmrkkrmmLLLLk",
+  "kmmLLmkkmmLLLLmk",
+  "kLmmLmkkmmhhhhhk",
+  "kdddddKKddhBBhdk",
+  "kLLhLLkkLLhBhhLk",
+  "kmmhLmkkmmSSSSmk",
+  "kddhddKKddWWSSdk",
+  "kLLhLLkkLLWWSLLk",
+  "kmSSSLkkmmWWSmmk",
+  "kSwwwSkkLLWWSSmk",
+  "kddSSdKKddWWSSdk",
+  "kLLmLLkkLLmWWmLk",
+  "kmmLmmkkmmLLmmLk",
+  "kddddmKKmddddddk",
+  "kkkkkkkkkkkkkkkk"
+], {
+  k: '#1c150c', K: '#302214', r: '#6b321c', h: '#472814', B: '#2e1a0c',
+  d: '#8a6840', m: '#ad8958', l: '#c29e68', L: '#cfa972',
+  S: '#b5b8bd', W: '#e8edf2', w: '#ffffff'
+});
+
+// 12. Слайм
+TEX.slime = buildSprite([
+  "aaaaaaaaaaaaaaaa",
+  "abbbbbbbbbbbbbba",
+  "abccccccccccccba",
+  "abcdddeeeedddcba",
+  "abcddeeffeeddcba",
+  "abcdeefggfeedcba",
+  "abcdeefggfeedcba",
+  "abcdeeeffeeddcba",
+  "abcdddeeeedddcba",
+  "abcdddeeeedddcba",
+  "abcddddddddddcba",
+  "abccccccccccccba",
+  "abbbbbbbbbbbbbba",
+  "abbbbbbbbbbbbbba",
+  "aaaaaaaaaaaaaaaa",
+  "aaaaaaaaaaaaaaaa"
+], {
+  a: 'rgba(130, 212, 94, 0.85)', b: 'rgba(116, 198, 82, 0.88)',
+  c: '#6ab848', d: '#5da63e', e: '#78d452', f: '#9ef075', g: '#caffaa'
+});
+
+// 13. Блок увеличения 3x3
+TEX.giant = buildSprite([
+  "0000000000000000",
+  "0111111111111110",
+  "0122222222222210",
+  "0123333443333210",
+  "0123344554433210",
+  "0123455555543210",
+  "0123334554333210",
+  "0124434554344210",
+  "0124544554454210",
+  "0123334554333210",
+  "0123455555543210",
+  "0123344554433210",
+  "0123333443333210",
+  "0122222222222210",
+  "0111111111111110",
+  "0000000000000000"
+], { '0': '#240046', '1': '#3c096c', '2': '#5a189a', '3': '#7b2cbf', '4': '#c77dff', '5': '#ffffff' });
+
+// --- КИРКИ ---
+const PICK_SHAPE = [
+  "................",
+  ".....DDDDD......",
+  "....DWHMMMDbB...",
+  ".....DDDDMMBk...",
+  ".........bMMD...",
+  "........bBkMMD..",
+  ".......bBk.DMD..",
+  "......bBk..DMD..",
+  ".....bBk...DHD..",
+  "....bBk....DWD..",
+  "...bBk......D...",
+  "..bBk...........",
+  ".bBk............",
+  ".Bk.............",
+  "................",
+  "................"
+];
+
+TEX.pick_wood = buildSprite(PICK_SHAPE, {
+  D: '#281e0b', M: '#684e1e', H: '#7c5c23', W: '#896727',
+  k: '#281e0b', b: '#493615', B: '#684e1e'
+});
+TEX.pick_stone = buildSprite(PICK_SHAPE, {
+  D: '#2b2b2b', M: '#7a7a7a', H: '#949494', W: '#adadad',
+  k: '#281e0b', b: '#5c4217', B: '#7c5c23'
+});
+TEX.pick_copper = buildSprite(PICK_SHAPE, {
+  D: '#5c2a1a', M: '#c96a48', H: '#e88b68', W: '#ffbaa0',
+  k: '#281e0b', b: '#5c4217', B: '#7c5c23'
+});
+TEX.pick_iron = buildSprite(PICK_SHAPE, {
+  D: '#404040', M: '#bdbdbd', H: '#d9d9d9', W: '#ffffff',
+  k: '#281e0b', b: '#5c4217', B: '#7c5c23'
+});
+TEX.pick_gold = buildSprite(PICK_SHAPE, {
+  D: '#7a5410', M: '#e8a817', H: '#f7cf2a', W: '#fff685',
+  k: '#281e0b', b: '#5c4217', B: '#7c5c23'
+});
+TEX.pick_diamond = buildSprite(PICK_SHAPE, {
+  D: '#134e4a', M: '#20c9b8', H: '#5ef2e6', W: '#b5fff9',
+  k: '#281e0b', b: '#5c4217', B: '#7c5c23'
+});
+
+// --- 8 СТАДИЙ ТРЕЩИН РАЗРУШЕНИЯ ---
+const CRACK_PAL = { '#': 'rgba(20, 20, 20, 0.88)', '+': 'rgba(95, 95, 95, 0.72)' };
+TEX.cracks = [
+  buildSprite([
+    "................","................","................","................",
+    "................","................",".......#........",".......+#.......",
+    "........+.......","................","................","................",
+    "................","................","................","................"
+  ], CRACK_PAL),
+  buildSprite([
+    "................","................","................","................",
+    "......#.........","......#.........","......+#.#......",".......##+......",
+    "........#.......","........+.......","................","................",
+    "................","................","................","................"
+  ], CRACK_PAL),
+  buildSprite([
+    "................","................","................",".....#..........",
+    ".....#..........",".....#....##....",".....+#..##+....","......###+......",
+    ".......#........",".......#........","......##........","......+.........",
+    "................","................","................","................"
+  ], CRACK_PAL),
+  buildSprite([
+    "................","................",".......#........","......#+........",
+    "......#....#....",".....##.#..#....",".....+#####+....","........#+......",
+    "........#.......","........#.......","......###.......","......++........",
+    "................","................","................","................"
+  ], CRACK_PAL),
+  buildSprite([
+    "................",".......#........","......##........",".....#+#...#....",
+    ".....#.#..##....","...####.##+.....","...+..###.......",".......#........",
+    ".......#........",".......#........","....####........","....+++.........",
+    ".......#........","................","................","................"
+  ], CRACK_PAL),
+  buildSprite([
+    "................","......#.#.......","......###.......",".....#..#..#....",
+    ".....#..###+....","...###..##......","..#+..###.##....","..#....#..++....",
+    ".......#........",".......#........","...#####........","...+....#.......",
+    "........#.......",".........#......","................","................"
+  ], CRACK_PAL),
+  buildSprite([
+    "................",".....###........","....#..###......","...###.#..#..#..",
+    "....#..#.##.##..","..###..###.#+...","..#.#.##.#.#....",".##.###..###....",
+    ".#..#...##.#....","...####..###....","..#+..####+.....",".#.#....#.#.....",
+    ".#.##...###.....","..+.#..#+..+....","....+...........","................"
+  ], CRACK_PAL),
+  buildSprite([
+    ".....#...#..+...","...###..##.#....","..#.##.###.##...","..####.#.#.#.#..",
+    "...#.#.###.###..",".####..##.#.#...",".#.##.###.###...","##..###.#..###..",
+    "#..##.#.###..#..","##.####.#.###...",".#+###.#####.#..",".###..##..###...",
+    "..###.#..###.#..","..#.##..##..##..","...+.#..+#..+...","................"
+  ], CRACK_PAL)
+];
+
+// ================= ДВУХСЛОЙНЫЙ ПОДЗЕМНЫЙ ФОН =================
+function makeDarkBgTile(srcTex, darkness) {
+  const c = document.createElement('canvas');
+  c.width = 16; c.height = 16;
+  const g = c.getContext('2d');
+  g.drawImage(srcTex, 0, 0);
+  g.fillStyle = `rgba(10, 10, 14, ${darkness})`;
+  g.fillRect(0, 0, 16, 16);
+  return c;
+}
+
+const BG_STONE      = makeDarkBgTile(TEX.stone, 0.74);
+const BG_COAL       = makeDarkBgTile(TEX.coal, 0.78);
+const BG_IRON       = makeDarkBgTile(TEX.iron, 0.80);
+const BG_GOLD       = makeDarkBgTile(TEX.gold, 0.82);
+const BG_DIAMOND    = makeDarkBgTile(TEX.diamond, 0.83);
+
+const BG_DS         = makeDarkBgTile(TEX.deepslate, 0.68);
+const BG_DS_COBBLE  = makeDarkBgTile(TEX.deepslate_cobble, 0.70);
+const BG_DS_COAL    = makeDarkBgTile(TEX.ds_coal, 0.72);
+const BG_DS_IRON    = makeDarkBgTile(TEX.ds_iron, 0.76);
+const BG_DS_GOLD    = makeDarkBgTile(TEX.ds_gold, 0.78);
+const BG_DS_DIAMOND = makeDarkBgTile(TEX.ds_diamond, 0.79);
+
+function getInnerBgTile(c, r) {
+  const depth = Math.max(0, r - 3);
+  const h = (((c * 374761393 + r * 668265263) ^ (r * 1274126177)) >>> 0) % 1000;
+
+  if (depth >= 150) {
+    if (h < 22) return BG_DS_COAL;
+    if (h < 34) return BG_DS_IRON;
+    if (h < 41) return BG_DS_GOLD;
+    if (h < 46) return BG_DS_DIAMOND;
+    return (h % 3 === 0) ? BG_DS_COBBLE : BG_DS;
+  }
+
+  if (depth >= 135) {
+    const t = (depth - 135) / 15;
+    if ((h / 1000) < 0.1 + t * 0.85) {
+      return (h % 3 === 0) ? BG_DS_COBBLE : BG_DS;
+    }
+  }
+
+  if (h < 22) return BG_COAL;
+  if (h < 34) return BG_IRON;
+  if (h < 41) return BG_GOLD;
+  if (h < 46) return BG_DIAMOND;
+  return BG_STONE;
+}
+
+// Внешний фон
+const OUTER_TILES_N = 8;
+const OUTER_BG = document.createElement('canvas');
+OUTER_BG.width = OUTER_TILES_N * 16;
+OUTER_BG.height = OUTER_TILES_N * 16;
+(function buildOuterMineBg() {
+  const g = OUTER_BG.getContext('2d');
+  g.imageSmoothingEnabled = false;
+
+  const map = [
+    "SScSSVVV",
+    "SSiSVBTB",
+    "SScSSBVV",
+    "SSSdSScS",
+    "ScSSgSSS",
+    "SVBSSSBS",
+    "iTVSSdBS",
+    "ScSSgVVV"
+  ];
+
+  const torches = [];
+  for (let ty = 0; ty < OUTER_TILES_N; ty++) {
+    for (let tx = 0; tx < OUTER_TILES_N; tx++) {
+      const ch = map[ty][tx];
+      const px = tx * 16;
+      const py = ty * 16;
+
+      if (ch === 'S') g.drawImage(TEX.stone, px, py);
+      else if (ch === 'c') g.drawImage(TEX.coal, px, py);
+      else if (ch === 'i') g.drawImage(TEX.iron, px, py);
+      else if (ch === 'g') g.drawImage(TEX.gold, px, py);
+      else if (ch === 'd') g.drawImage(TEX.diamond, px, py);
+      else {
+        g.drawImage((tx + ty) % 5 === 0 ? TEX.diamond : TEX.stone, px, py);
+        g.fillStyle = 'rgba(12, 12, 16, 0.72)';
+        g.fillRect(px, py, 16, 16);
+
+        if (ch === 'B') {
+          g.fillStyle = '#3d2511';
+          g.fillRect(px, py, 16, 4);
+          g.fillStyle = '#523217';
+          g.fillRect(px, py + 1, 16, 2);
+          g.fillStyle = '#36200d';
+          g.fillRect(px + 6, py + 4, 4, 12);
+          g.fillStyle = '#4a2c13';
+          g.fillRect(px + 7, py + 4, 2, 12);
+        } else if (ch === 'T') {
+          torches.push({ x: px + 8, y: py + 6 });
+        }
+      }
+    }
+  }
+
+  g.fillStyle = 'rgba(12, 13, 18, 0.42)';
+  g.fillRect(0, 0, OUTER_BG.width, OUTER_BG.height);
+
+  for (const t of torches) {
+    const grad = g.createRadialGradient(t.x, t.y, 1, t.x, t.y, 34);
+    grad.addColorStop(0, 'rgba(255, 196, 75, 0.48)');
+    grad.addColorStop(0.5, 'rgba(255, 130, 30, 0.16)');
+    grad.addColorStop(1, 'rgba(255, 120, 20, 0)');
+    g.fillStyle = grad;
+    g.fillRect(t.x - 34, t.y - 34, 68, 68);
+
+    g.fillStyle = '#5c3a1e';
+    g.fillRect(t.x - 1, t.y + 1, 2, 8);
+    g.fillStyle = '#ff7b00';
+    g.fillRect(t.x - 1, t.y - 2, 2, 3);
+    g.fillStyle = '#fff176';
+    g.fillRect(t.x - 1, t.y - 1, 2, 2);
+  }
+})();
+
+// ================= PICKAXE DEFINITIONS =================
+const UPGRADE_CHAIN = ['wood', 'stone', 'copper', 'iron', 'diamond'];
+const PICK_DEFS = {
+  wood:    { name: 'Деревянная', color: '#c49a6c', maxHp: 100, stoneSec: 1.0,  oreSec: 1.25, weight: 48, tex: TEX.pick_wood },
+  stone:   { name: 'Каменная',   color: '#bdbdbd', maxHp: 200, stoneSec: 0.75, oreSec: 1.0,  weight: 27, tex: TEX.pick_stone },
+  copper:  { name: 'Медная',     color: '#f2875e', maxHp: 350, stoneSec: 0.68, oreSec: 0.93, weight: 14, tex: TEX.pick_copper },
+  iron:    { name: 'Железная',   color: '#ffffff', maxHp: 500, stoneSec: 0.6,  oreSec: 0.85, weight: 7,  tex: TEX.pick_iron },
+  gold:    { name: 'Золотая ⚡',  color: '#ffdf33', maxHp: 200, stoneSec: 0.25, oreSec: 0.5,  weight: 3,  tex: TEX.pick_gold },
+  diamond: { name: 'Алмазная 💎', color: '#5ef2e6', maxHp: 700, stoneSec: 0.4,  oreSec: 0.65, weight: 1,  tex: TEX.pick_diamond }
+};
+const ALL_TIERS = ['wood', 'stone', 'copper', 'iron', 'gold', 'diamond'];
+
+function rollRandomTier() {
+  let r = Math.random() * 100;
+  for (const t of ALL_TIERS) {
+    r -= PICK_DEFS[t].weight;
+    if (r <= 0) return t;
+  }
+  return 'wood';
+}
+
+// ================= INFINITE SHAFT (10 PLAYABLE + 2 BEDROCK = 12 COLS) =================
+const COLS = 12;
+const B_EMPTY            = 0;
+const B_STONE            = 1;
+const B_COAL             = 2;
+const B_COPPER           = 3;
+const B_IRON             = 4;
+const B_GOLD             = 5;
+const B_DIAMOND          = 6;
+const B_BEDROCK          = 7;
+const B_SLIME            = 8;
+const B_GIANT            = 9;
+const B_TNT              = 10;
+const B_CRAFT            = 11;
+const B_EMERALD          = 12;
+const B_CHEST            = 13;
+const B_DEEPSLATE        = 14;
+const B_DEEPSLATE_COBBLE = 15;
+const B_DS_COAL          = 16;
+const B_DS_COPPER        = 17;
+const B_DS_IRON          = 18;
+const B_DS_GOLD          = 19;
+const B_DS_DIAMOND       = 20;
+
+const BLOCK_TEX_MAP = {
+  [B_STONE]: TEX.stone,
+  [B_COAL]: TEX.coal,
+  [B_COPPER]: TEX.copper,
+  [B_IRON]: TEX.iron,
+  [B_GOLD]: TEX.gold,
+  [B_DIAMOND]: TEX.diamond,
+  [B_BEDROCK]: TEX.bedrock,
+  [B_SLIME]: TEX.slime,
+  [B_GIANT]: TEX.giant,
+  [B_TNT]: TEX.tnt,
+  [B_CRAFT]: TEX.craft,
+  [B_EMERALD]: TEX.emerald,
+  [B_CHEST]: TEX.chest,
+  [B_DEEPSLATE]: TEX.deepslate,
+  [B_DEEPSLATE_COBBLE]: TEX.deepslate_cobble,
+  [B_DS_COAL]: TEX.ds_coal,
+  [B_DS_COPPER]: TEX.ds_copper,
+  [B_DS_IRON]: TEX.ds_iron,
+  [B_DS_GOLD]: TEX.ds_gold,
+  [B_DS_DIAMOND]: TEX.ds_diamond
+};
+
+const ORE_MULT = {
+  [B_COPPER]:     0.03,
+  [B_IRON]:       0.12,
+  [B_GOLD]:       0.22,
+  [B_DIAMOND]:    0.45,
+  [B_DS_COPPER]:  0.03,
+  [B_DS_IRON]:    0.12,
+  [B_DS_GOLD]:    0.22,
+  [B_DS_DIAMOND]: 0.45
+};
+
+function isDeepslateBlock(t) {
+  return t >= B_DEEPSLATE && t <= B_DS_DIAMOND;
+}
+
+function isOreBlock(t) {
+  return (
+    t === B_COAL || t === B_COPPER || t === B_IRON || t === B_GOLD || t === B_DIAMOND ||
+    t === B_DS_COAL || t === B_DS_COPPER || t === B_DS_IRON || t === B_DS_GOLD || t === B_DS_DIAMOND ||
+    t === B_EMERALD
+  );
+}
+
+let rowsMap = new Map();
+let dmgMap = new Map();
+let maxGenRow = -1;
+
+function getBlock(c, r) {
+  if (c < 0 || c >= COLS || r < 0) return B_BEDROCK;
+  const row = rowsMap.get(r);
+  return row ? row[c] : B_STONE;
+}
+
+function setBlock(c, r, val) {
+  if (c < 0 || c >= COLS || r < 0) return;
+  const row = rowsMap.get(r);
+  if (row) row[c] = val;
+}
+
+function getDmg(c, r) {
+  const row = dmgMap.get(r);
+  return row ? row[c] : 0;
+}
+
+function setDmg(c, r, val) {
+  const row = dmgMap.get(r);
+  if (row) row[c] = val;
+}
+
+function pickDeepslateRock() {
+  return Math.random() < 0.62 ? B_DEEPSLATE : B_DEEPSLATE_COBBLE;
+}
+
+function generateRow(r) {
+  const row = new Uint8Array(COLS);
+  const dmg = new Float32Array(COLS);
+
+  if (r === 0) {
+    row.fill(B_BEDROCK);
+    rowsMap.set(r, row);
+    dmgMap.set(r, dmg);
+    return;
+  }
+
+  row[0] = B_BEDROCK;
+  row[COLS - 1] = B_BEDROCK;
+
+  if (r >= 1 && r <= 3) {
+    for (let c = 1; c < COLS - 1; c++) row[c] = B_EMPTY;
+    rowsMap.set(r, row);
+    dmgMap.set(r, dmg);
+    return;
+  }
+
+  const depth = Math.max(0, r - 3);
+  const isDeepZone = depth >= 150;
+  const depthFactor = Math.min(1, depth / 140);
+
+  for (let c = 1; c < COLS - 1; c++) {
+    if (r === 4) {
+      row[c] = Math.random() < 0.90 ? B_STONE : B_COPPER;
+      continue;
+    }
+
+    if (Math.random() < 0.085) {
+      row[c] = B_EMPTY;
+      continue;
+    }
+
+    const roll = Math.random();
+    if (roll < 0.0024 && depth > 18) {
+      row[c] = B_EMERALD;
+    } else if (roll < 0.0085 && depth > 8) {
+      row[c] = B_CHEST;
+    } else if (roll < 0.0165 && depth > 10) {
+      row[c] = B_CRAFT;
+    } else if (roll < 0.030 && depth > 7) {
+      row[c] = B_TNT;
+    } else if (roll < 0.044 && depth > 8) {
+      row[c] = B_SLIME;
+    } else if (roll < 0.054 && depth > 10) {
+      row[c] = B_GIANT;
+    } else if (roll < 0.059 + depthFactor * 0.025 && depth > 15) {
+      row[c] = isDeepZone ? B_DS_DIAMOND : B_DIAMOND;
+    } else if (roll < 0.079 + depthFactor * 0.026 && depth > 11) {
+      row[c] = isDeepZone ? B_DS_GOLD : B_GOLD;
+    } else if (roll < 0.128 + depthFactor * 0.026) {
+      row[c] = isDeepZone ? B_DS_IRON : B_IRON;
+    } else if (roll < 0.198) {
+      row[c] = isDeepZone ? B_DS_COPPER : B_COPPER;
+    } else if (roll < 0.285) {
+      row[c] = isDeepZone ? B_DS_COAL : B_COAL;
+    } else {
+      if (isDeepZone) {
+        row[c] = pickDeepslateRock();
+      } else if (depth >= 135) {
+        const progress = (depth - 135) / 15;
+        const noise = ((((c * 2654435761) ^ (r * 2246822519)) >>> 0) % 100) / 100;
+        const chance = Math.min(0.96, 0.08 + Math.pow(progress, 1.2) * 0.88 + (noise - 0.5) * 0.22);
+        row[c] = Math.random() < chance ? pickDeepslateRock() : B_STONE;
+      } else {
+        row[c] = B_STONE;
+      }
+    }
+  }
+
+  if (r > 5 && rowsMap.has(r - 1)) {
+    const prev = rowsMap.get(r - 1);
+    for (let c = 1; c < COLS - 1; c++) {
+      const isPlainRock = (row[c] === B_STONE || row[c] === B_DEEPSLATE || row[c] === B_DEEPSLATE_COBBLE);
+      if (!isPlainRock) continue;
+      const up = prev[c];
+
+      if (!isDeepZone) {
+        if ((up === B_COAL || up === B_COPPER || up === B_IRON) && Math.random() < 0.19) {
+          row[c] = up;
+        } else if ((up === B_GOLD || up === B_DIAMOND) && Math.random() < 0.13) {
+          row[c] = up;
+        }
+      } else {
+        if ((up === B_DS_COAL || up === B_DS_COPPER || up === B_DS_IRON) && Math.random() < 0.19) {
+          row[c] = up;
+        } else if ((up === B_DS_GOLD || up === B_DS_DIAMOND) && Math.random() < 0.13) {
+          row[c] = up;
+        }
+      }
+    }
+  }
+
+  rowsMap.set(r, row);
+  dmgMap.set(r, dmg);
+}
+
+function ensureRowsGenerated(upToRow) {
+  while (maxGenRow < upToRow) {
+    maxGenRow++;
+    generateRow(maxGenRow);
+  }
+}
+
+// ================= ECONOMY & SAVE =================
+const SAVE_KEY = 'pickaxe_bet_tma_v1';
+let balance = 100.0;
+let currentBet = 10;
+
+try {
+  const saved = JSON.parse(
+    localStorage.getItem(SAVE_KEY) ||
+    localStorage.getItem('pickaxe_bet_v5') ||
+    localStorage.getItem('pickaxe_bet_v4') ||
+    localStorage.getItem('pickaxe_bet_v3')
+  );
+  if (saved && typeof saved.balance === 'number' && !isNaN(saved.balance)) {
+    balance = Math.max(0, Math.round(saved.balance * 100) / 100);
+  }
+} catch(e) {}
+
+function saveBalance() {
+  balance = Math.max(0, Math.round(balance * 100) / 100);
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify({ balance })); } catch(e) {}
+}
+
+function fmtMoney(v) {
+  return (Math.round(v * 100) / 100).toFixed(2);
+}
+
+// ================= CANVAS SETUP =================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let BLOCK_SIZE = 44;
+let shaftOffsetX = 0;
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const maxShaftPx = Math.min(canvas.width, 540);
+  BLOCK_SIZE = Math.floor(maxShaftPx / COLS);
+  shaftOffsetX = Math.floor((canvas.width - BLOCK_SIZE * COLS) / 2);
+  ctx.imageSmoothingEnabled = false;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ================= GAME STATE =================
+let mode = 'lobby';
+let isPaused = false;
+let gameSpeed = 1;
+let particles = [];
+let floatingTexts = [];
+let explosionsFx = [];
+let pendingTNT = [];
+let hitCooldowns = new Map();
+let cameraY = 0;
+let shakeTime = 0;
+let toastTimer = null;
+
+let runStats = {
+  bet: 10,
+  startTier: 'wood',
+  earned: 0,
+  copper: 0,
+  iron: 0,
+  gold: 0,
+  diamond: 0,
+  emerald: 0,
+  chests: 0,
+  maxDepth: 0,
+  reachedDeepslate: false
+};
+
+const pick = {
+  x: 6.0,
+  y: 2.2,
+  vx: 0,
+  vy: 0,
+  angle: 0,
+  vAngle: 0.14,
+  tier: 'wood',
+  hp: 100,
+  maxHp: 100,
+  giantTimer: 0
+};
+
+function showToast(msg, color = '#ffd166') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.borderColor = color;
+  el.style.color = color;
+  el.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ================= SPEED & PAUSE CONTROLS =================
+function setGameSpeed(spd) {
+  gameSpeed = spd;
+  [1, 2, 3].forEach(n => {
+    const b = document.getElementById(`spd-${n}`);
+    if (b) b.classList.toggle('active', n === spd);
+  });
+}
+
+function togglePause() {
+  if (mode !== 'playing') return;
+  isPaused = !isPaused;
+  const ov = document.getElementById('pause-overlay');
+  if (isPaused) {
+    document.getElementById('pause-depth').textContent = `${runStats.maxDepth}м`;
+    document.getElementById('pause-earned').textContent = `${fmtMoney(runStats.earned)} ₽`;
+    document.getElementById('pause-pick').textContent = `${PICK_DEFS[pick.tier].name} (${Math.ceil(pick.hp)}/${pick.maxHp} HP)`;
+    ov.classList.add('active');
+  } else {
+    ov.classList.remove('active');
+    lastTime = performance.now();
+  }
+}
+
+function quitFromPause() {
+  if (mode !== 'playing') return;
+  isPaused = false;
+  document.getElementById('pause-overlay').classList.remove('active');
+  finishRun();
+}
+
+// ================= LOBBY & BETTING UI =================
+function syncLobbyUI() {
+  document.getElementById('lobby-balance').textContent = fmtMoney(balance);
+  document.getElementById('bal-hud').textContent = fmtMoney(balance);
+
+  if (balance < 1) {
+    currentBet = 10;
+  } else if (currentBet > balance) {
+    currentBet = Math.max(1, Math.floor(balance));
+  }
+  document.getElementById('bet-display').textContent = `${currentBet} ₽`;
+
+  const spinBtn = document.getElementById('btn-spin');
+  const freeBtn = document.getElementById('btn-free-money');
+  if (balance < 1) {
+    spinBtn.disabled = true;
+    spinBtn.textContent = 'НЕТ ДЕНЕГ НА СТАВКУ';
+    freeBtn.style.display = 'block';
+  } else {
+    spinBtn.disabled = false;
+    spinBtn.textContent = `🎲 СТАВИТЬ ${currentBet} ₽ И КОПАТЬ`;
+    freeBtn.style.display = 'none';
+  }
+}
+
+function selectBet(val, btnEl) {
+  document.querySelectorAll('.bet-chip').forEach(b => b.classList.remove('selected'));
+  if (btnEl) btnEl.classList.add('selected');
+  if (val === 'all') {
+    currentBet = Math.max(1, Math.floor(balance));
+  } else {
+    currentBet = Math.min(val, Math.max(1, Math.floor(balance)));
+  }
+  syncLobbyUI();
+}
+
+function stepBet(delta) {
+  document.querySelectorAll('.bet-chip').forEach(b => b.classList.remove('selected'));
+  currentBet = Math.max(1, Math.min(Math.max(1, Math.floor(balance)), currentBet + delta));
+  syncLobbyUI();
+}
+
+function freeTopUp() {
+  if (balance >= 1) return;
+  balance = 100;
+  saveBalance();
+  playSound('upgrade');
+  syncLobbyUI();
+}
+
+function initPreviewShaft() {
+  rowsMap.clear();
+  dmgMap.clear();
+  maxGenRow = -1;
+  ensureRowsGenerated(35);
+  cameraY = 0;
+}
+
+// ================= ROULETTE SPIN =================
+const rIconCanvas = document.getElementById('roulette-icon');
+const rIconCtx = rIconCanvas.getContext('2d');
+rIconCtx.imageSmoothingEnabled = false;
+
+function drawRoulettePick(tier) {
+  const def = PICK_DEFS[tier];
+  rIconCtx.clearRect(0, 0, 16, 16);
+  rIconCtx.drawImage(def.tex, 0, 0);
+  const nameEl = document.getElementById('roulette-name');
+  nameEl.textContent = def.name;
+  nameEl.style.color = def.color;
+  document.getElementById('roulette-stats').textContent = `❤️ ${def.maxHp} HP | Камень ${def.stoneSec}с`;
+  document.getElementById('roulette-box').style.borderColor = def.color;
+}
+
+function startSpin() {
+  if (mode !== 'lobby' || balance < currentBet || currentBet < 1) return;
+
+  balance -= currentBet;
+  saveBalance();
+  syncLobbyUI();
+
+  mode = 'spinning';
+  document.getElementById('lobby-overlay').classList.remove('active');
+  document.getElementById('roulette-overlay').classList.add('active');
+
+  const finalTier = rollRandomTier();
+  let ticks = 0;
+  const totalTicks = 16;
+
+  function doTick() {
+    ticks++;
+    if (ticks < totalTicks) {
+      const randT = ALL_TIERS[Math.floor(Math.random() * ALL_TIERS.length)];
+      drawRoulettePick(randT);
+      playSound('tick');
+      const delay = 45 + Math.pow(ticks / totalTicks, 2) * 140;
+      setTimeout(doTick, delay);
+    } else {
+      drawRoulettePick(finalTier);
+      playSound('upgrade');
+      setTimeout(() => {
+        document.getElementById('roulette-overlay').classList.remove('active');
+        launchDrop(finalTier, currentBet);
+      }, 650);
+    }
+  }
+  doTick();
+}
+
+// ================= LAUNCH DROP =================
+function launchDrop(startTier, betAmount) {
+  rowsMap.clear();
+  dmgMap.clear();
+  maxGenRow = -1;
+  ensureRowsGenerated(40);
+
+  particles = [];
+  floatingTexts = [];
+  explosionsFx = [];
+  pendingTNT = [];
+  hitCooldowns.clear();
+  isPaused = false;
+
+  const def = PICK_DEFS[startTier];
+  pick.x = COLS / 2;
+  pick.y = 2.2;
+  pick.vx = (Math.random() - 0.5) * 4.5;
+  pick.vy = 2.5;
+  pick.angle = 0;
+  pick.vAngle = 0.16;
+  pick.tier = startTier;
+  pick.hp = def.maxHp;
+  pick.maxHp = def.maxHp;
+  pick.giantTimer = 0;
+
+  runStats = {
+    bet: betAmount,
+    startTier,
+    earned: 0,
+    copper: 0,
+    iron: 0,
+    gold: 0,
+    diamond: 0,
+    emerald: 0,
+    chests: 0,
+    maxDepth: 0,
+    reachedDeepslate: false
+  };
+
+  cameraY = 0;
+  mode = 'playing';
+  document.getElementById('pause-overlay').classList.remove('active');
+  document.getElementById('corner-controls').style.display = 'flex';
+  updateHUD();
+}
+
+function updateHUD() {
+  const def = PICK_DEFS[pick.tier];
+  const tierEl = document.getElementById('tier-pill');
+  tierEl.textContent = `⛏️ ${def.name} (${def.stoneSec}с)`;
+  tierEl.style.borderColor = def.color;
+  tierEl.style.color = def.color;
+
+  document.getElementById('hp-val').textContent = `${Math.ceil(pick.hp)} / ${pick.maxHp}`;
+  document.getElementById('depth-val').textContent = runStats.maxDepth;
+  document.getElementById('depth-pill').classList.toggle('deepslate', runStats.maxDepth >= 150);
+
+  document.getElementById('bal-hud').textContent = fmtMoney(balance);
+  document.getElementById('bet-hud').textContent = runStats.bet;
+  document.getElementById('earned-hud').textContent = fmtMoney(runStats.earned);
+
+  const earnedPill = document.getElementById('earned-pill');
+  earnedPill.classList.toggle('win', runStats.earned >= runStats.bet);
+  earnedPill.classList.toggle('loss', runStats.earned < runStats.bet);
+
+  const gWrap = document.getElementById('giant-bar-wrap');
+  if (pick.giantTimer > 0) {
+    gWrap.style.display = 'block';
+    document.getElementById('giant-bar-fill').style.width = `${Math.min(100, (pick.giantTimer / 8) * 100)}%`;
+  } else {
+    gWrap.style.display = 'none';
+  }
+}
+
+// ================= CONTROLS =================
+function nudgePick(dirX) {
+  if (mode !== 'playing' || isPaused) return;
+  pick.vx += dirX * 5.0;
+  pick.vx = Math.max(-10.5, Math.min(10.5, pick.vx));
+  pick.vAngle = dirX * 0.22;
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if (mode !== 'playing' || isPaused) return;
+  const pickScreenX = shaftOffsetX + pick.x * BLOCK_SIZE;
+  const dirX = e.clientX < pickScreenX ? -1 : 1;
+  nudgePick(dirX);
+});
+
+window.addEventListener('keydown', e => {
+  if (e.code === 'Escape') {
+    if (mode === 'playing') {
+      e.preventDefault();
+      togglePause();
+    }
+    return;
+  }
+  if (mode !== 'playing' || isPaused) return;
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') nudgePick(-1);
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') nudgePick(1);
+});
+
+// ================= FX =================
+function spawnParticles(bx, by, color, count = 7) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: bx, y: by,
+      vx: (Math.random() - 0.5) * 6.5,
+      vy: (Math.random() - 0.85) * 6.5,
+      size: 0.1 + Math.random() * 0.14,
+      color,
+      life: 0.36 + Math.random() * 0.24
+    });
+  }
+}
+
+function spawnFloat(bx, by, text, color = '#fff', size = 14) {
+  floatingTexts.push({
+    x: bx + (Math.random() - 0.5) * 0.4,
+    y: by,
+    vy: -1.7,
+    text,
+    color,
+    size,
+    life: 0.88
+  });
+}
+
+// ================= CRAFT, CHEST, EMERALD, REWARDS & TNT =================
+function triggerCraftingTable(cx, cy) {
+  playSound('upgrade');
+  shakeTime = 0.25;
+  spawnParticles(cx, cy, '#cfa972', 18);
+
+  if (pick.tier === 'diamond') {
+    const prevHp = pick.hp;
+    pick.maxHp = 700;
+    pick.hp = Math.min(700, pick.hp + 150);
+    const healed = Math.round(pick.hp - prevHp);
+    showToast(healed > 0 ? `🪵 ВЕРСТАК: АЛМАЗНАЯ +${healed} HP!` : '🪵 ВЕРСТАК: АЛМАЗНАЯ УЖЕ ФУЛЛ (700 HP)!', '#5ef2e6');
+    spawnFloat(cx, cy - 0.3, `+${healed} ❤️`, '#5ef2e6', 16);
+    return;
+  }
+
+  let nextTier = 'stone';
+  if (pick.tier === 'gold') {
+    nextTier = 'diamond';
+  } else {
+    const idx = UPGRADE_CHAIN.indexOf(pick.tier);
+    nextTier = UPGRADE_CHAIN[Math.min(UPGRADE_CHAIN.length - 1, idx + 1)];
+  }
+
+  const def = PICK_DEFS[nextTier];
+  pick.tier = nextTier;
+  pick.maxHp = def.maxHp;
+  pick.hp = def.maxHp;
+  spawnParticles(pick.x, pick.y, def.color, 24);
+  showToast(`🪵 ВЕРСТАК → ${def.name.toUpperCase()} (${def.maxHp} HP)!`, def.color);
+  spawnFloat(cx, cy - 0.3, `⬆ ${def.name}!`, def.color, 16);
+}
+
+function openChest(cx, cy) {
+  runStats.chests++;
+  runStats.earned = Math.round((runStats.earned + 10) * 100) / 100;
+  playSound('chest');
+  spawnParticles(cx, cy, '#ffd166', 16);
+  spawnParticles(cx, cy, '#ad7a2c', 8);
+  spawnFloat(cx, cy - 0.2, '+10.00 ₽ 🧰', '#ffd166', 17);
+  showToast('🧰 СУНДУК! +10 ₽ В КОПИЛКУ!', '#ffd166');
+}
+
+function collectEmeraldJackpot(cx, cy) {
+  runStats.emerald++;
+  const basePot = runStats.earned > 0 ? runStats.earned * 3 : runStats.bet * 3;
+  const finalPot = Math.max(runStats.bet * 3, basePot);
+  runStats.earned = Math.round(finalPot * 100) / 100;
+  shakeTime = 0.4;
+  playSound('emerald_win');
+  spawnParticles(cx, cy, '#7df5a5', 28);
+  spawnParticles(cx, cy, '#1cc454', 20);
+  spawnFloat(cx, cy - 0.3, `×3 КОПИЛКА! 💚`, '#7df5a5', 20);
+  showToast(`💚 ИЗУМРУД СЛОМАН! КОПИЛКА ×3 → ${fmtMoney(runStats.earned)} ₽!`, '#54e884');
+}
+
+function collectBlockPayout(bType, cx, cy, fromTNT) {
+  if (bType === B_EMERALD) {
+    collectEmeraldJackpot(cx, cy);
+    return;
+  }
+
+  const mult = ORE_MULT[bType] || 0;
+
+  if (bType === B_COPPER || bType === B_DS_COPPER) {
+    runStats.copper++;
+    const gain = Math.round(runStats.bet * mult * 100) / 100;
+    runStats.earned = Math.round((runStats.earned + gain) * 100) / 100;
+    if (!fromTNT) playSound('ore');
+    spawnParticles(cx, cy, '#f2875e', 10);
+    spawnFloat(cx, cy, `+${fmtMoney(gain)}₽`, '#f2875e', 14);
+  } else if (bType === B_IRON || bType === B_DS_IRON) {
+    runStats.iron++;
+    const gain = Math.round(runStats.bet * mult * 100) / 100;
+    runStats.earned = Math.round((runStats.earned + gain) * 100) / 100;
+    if (!fromTNT) playSound('ore');
+    spawnParticles(cx, cy, '#d6ae92', 11);
+    spawnFloat(cx, cy, `+${fmtMoney(gain)}₽`, '#ffffff', 15);
+  } else if (bType === B_GOLD || bType === B_DS_GOLD) {
+    runStats.gold++;
+    const gain = Math.round(runStats.bet * mult * 100) / 100;
+    runStats.earned = Math.round((runStats.earned + gain) * 100) / 100;
+    if (!fromTNT) playSound('ore');
+    spawnParticles(cx, cy, '#ffdf33', 13);
+    spawnFloat(cx, cy, `+${fmtMoney(gain)}₽`, '#ffdf33', 16);
+  } else if (bType === B_DIAMOND || bType === B_DS_DIAMOND) {
+    runStats.diamond++;
+    const gain = Math.round(runStats.bet * mult * 100) / 100;
+    runStats.earned = Math.round((runStats.earned + gain) * 100) / 100;
+    if (!fromTNT) playSound('diamond');
+    spawnParticles(cx, cy, '#5ef2e6', 18);
+    spawnFloat(cx, cy, `+${fmtMoney(gain)}₽ 💎`, '#5ef2e6', 18);
+  } else if (bType === B_COAL || bType === B_DS_COAL) {
+    if (!fromTNT) playSound(bType === B_DS_COAL ? 'deepslate_break' : 'break');
+    spawnParticles(cx, cy, '#222222', 8);
+  } else if (bType === B_DEEPSLATE || bType === B_DEEPSLATE_COBBLE) {
+    if (!fromTNT) playSound('deepslate_break');
+    spawnParticles(cx, cy, '#4c4c54', 7);
+  } else if (bType === B_STONE) {
+    if (!fromTNT) playSound('break');
+    spawnParticles(cx, cy, '#7f7f7f', 6);
+  }
+}
+
+function detonateTNT(tc, tr) {
+  playSound('tnt');
+  shakeTime = 0.36;
+  const cx = tc + 0.5;
+  const cy = tr + 0.5;
+
+  explosionsFx.push({ x: cx, y: cy, radius: 0.5, maxRadius: 3.8, life: 0.32, maxLife: 0.32 });
+  spawnParticles(cx, cy, '#ff5400', 22);
+  spawnParticles(cx, cy, '#ffd166', 15);
+  spawnParticles(cx, cy, '#444444', 10);
+
+  const maxR = 4;
+  for (let dr = -maxR; dr <= maxR; dr++) {
+    for (let dc = -maxR; dc <= maxR; dc++) {
+      const c = tc + dc;
+      const r = tr + dr;
+      if (c <= 0 || c >= COLS - 1 || r <= 0) continue;
+      const dist = Math.hypot(dc, dr);
+      if (dist > 3.6) continue;
+
+      const destroyChance = dist <= 1.85 ? 1.0 : Math.max(0.15, 1.0 - (dist - 1.65) * 0.5);
+      if (Math.random() > destroyChance) continue;
+
+      const t = getBlock(c, r);
+      if (t === B_EMPTY || t === B_BEDROCK) continue;
+
+      if (t === B_EMERALD) {
+        const nextD = getDmg(c, r) + 0.55;
+        if (nextD < 1.0) {
+          setDmg(c, r, nextD);
+          spawnParticles(c + 0.5, r + 0.5, '#54e884', 12);
+          continue;
+        }
+      }
+
+      setBlock(c, r, B_EMPTY);
+      setDmg(c, r, 0);
+
+      if (t === B_TNT) {
+        pendingTNT.push({ c, r, timer: 0.13 });
+      } else if (t === B_CRAFT) {
+        triggerCraftingTable(c + 0.5, r + 0.5);
+      } else if (t === B_CHEST) {
+        openChest(c + 0.5, r + 0.5);
+      } else if (t === B_GIANT) {
+        pick.giantTimer = 8.0;
+        showToast('⚡ КИРКА 3×3!', '#c77dff');
+      } else if (t !== B_SLIME) {
+        collectBlockPayout(t, c + 0.5, r + 0.5, true);
+      }
+    }
+  }
+
+  const dx = pick.x - cx;
+  const dy = pick.y - cy;
+  const d = Math.hypot(dx, dy);
+  if (d < 5.5) {
+    const force = (5.5 - d) * 1.7;
+    pick.vx += (dx / (d + 0.2)) * force;
+    pick.vy = Math.min(pick.vy, -6.5 - force * 0.5);
+  }
+}
+
+// ================= HIT BLOCK LOGIC =================
+function hitBlock(c, r, bType, dx, dy) {
+  const cx = c + 0.5;
+  const cy = r + 0.5;
+
+  if (bType === B_BEDROCK) {
+    playSound('bedrock');
+    spawnParticles(cx, cy, '#555555', 4);
+    return false;
+  }
+
+  if (bType === B_SLIME) {
+    pick.vy = -13.5 - Math.random() * 2.5;
+    pick.vx += (Math.random() - 0.5) * 7.5;
+    pick.vAngle = (Math.random() < 0.5 ? -1 : 1) * 0.28;
+    playSound('slime');
+    spawnParticles(cx, cy, '#78d452', 12);
+    spawnFloat(cx, cy - 0.3, 'БОИНГ!', '#9ef075', 13);
+    return false;
+  }
+
+  if (bType === B_CRAFT) {
+    setBlock(c, r, B_EMPTY);
+    setDmg(c, r, 0);
+    triggerCraftingTable(cx, cy);
+    return true;
+  }
+
+  if (bType === B_CHEST) {
+    setBlock(c, r, B_EMPTY);
+    setDmg(c, r, 0);
+    openChest(cx, cy);
+    return true;
+  }
+
+  if (bType === B_GIANT) {
+    setBlock(c, r, B_EMPTY);
+    setDmg(c, r, 0);
+    pick.giantTimer = 8.0;
+    shakeTime = 0.18;
+    playSound('upgrade');
+    spawnParticles(cx, cy, '#c77dff', 18);
+    showToast('⚡ РАЗМЕР 3×3 (8 СЕК)!', '#c77dff');
+    return true;
+  }
+
+  if (bType === B_TNT) {
+    setBlock(c, r, B_EMPTY);
+    setDmg(c, r, 0);
+    detonateTNT(c, r);
+    return true;
+  }
+
+  const def = PICK_DEFS[pick.tier];
+  const isEmerald = (bType === B_EMERALD);
+  const isOre = isOreBlock(bType);
+  const isDS = isDeepslateBlock(bType);
+
+  const dsHardness = isDS ? 1.7 : 1.0;
+
+  let reqSec = (isOre ? def.oreSec : def.stoneSec) * dsHardness;
+  if (isEmerald) reqSec *= 2.35;
+  if (pick.giantTimer > 0) reqSec /= 1.35;
+
+  const stepDmg = 0.42 / reqSec;
+  const nextDmg = getDmg(c, r) + stepDmg;
+  setDmg(c, r, nextDmg);
+
+  pick.hp -= isOre ? 2 : 1;
+
+  if (nextDmg < 1.0) {
+    if (isEmerald) {
+      playSound('emerald_bounce');
+      spawnParticles(cx, cy, '#54e884', 10);
+      if (Math.random() < 0.45) spawnFloat(cx, cy - 0.3, 'ПРУЖИНИТ! 💚', '#7df5a5', 12);
+
+      const dist = Math.hypot(dx, dy) || 0.1;
+      const nx = dx / dist;
+      const ny = dy / dist;
+      pick.vx = nx * (8.5 + Math.random() * 3.0) + (Math.random() - 0.5) * 4.5;
+      pick.vy = ny < 0.2 ? -(11.5 + Math.random() * 2.8) : (7.5 + Math.random() * 2.0);
+      pick.vAngle = (Math.random() < 0.5 ? -1 : 1) * 0.34;
+    } else {
+      playSound(isDS ? 'deepslate_hit' : 'hit');
+      const colMap = {
+        [B_STONE]: '#888', [B_COAL]: '#333', [B_COPPER]: '#e88b68',
+        [B_IRON]: '#d6ae92', [B_GOLD]: '#ffdf33', [B_DIAMOND]: '#5ef2e6',
+        [B_DEEPSLATE]: '#4c4c54', [B_DEEPSLATE_COBBLE]: '#3b3b42',
+        [B_DS_COAL]: '#1c1c22', [B_DS_COPPER]: '#e88b68',
+        [B_DS_IRON]: '#d6ae92', [B_DS_GOLD]: '#ffdf33', [B_DS_DIAMOND]: '#5ef2e6'
+      };
+      spawnParticles(cx, cy, colMap[bType] || '#888', 3);
+    }
+    if (pick.hp <= 0) finishRun();
+    return false;
+  }
+
+  setBlock(c, r, B_EMPTY);
+  setDmg(c, r, 0);
+  collectBlockPayout(bType, cx, cy, false);
+  if (pick.hp <= 0) finishRun();
+  return true;
+}
+
+// ================= FINISH RUN =================
+function finishRun() {
+  if (mode !== 'playing') return;
+  pick.hp = 0;
+  isPaused = false;
+  mode = 'result';
+
+  document.getElementById('pause-overlay').classList.remove('active');
+  document.getElementById('corner-controls').style.display = 'none';
+
+  balance = Math.round((balance + runStats.earned) * 100) / 100;
+  saveBalance();
+  updateHUD();
+
+  const net = Math.round((runStats.earned - runStats.bet) * 100) / 100;
+  const banner = document.getElementById('res-profit-banner');
+  banner.textContent = net >= 0 ? `+${fmtMoney(net)} ₽ (ПРОФИТ!)` : `${fmtMoney(net)} ₽ (МИНУС)`;
+  banner.className = 'profit-banner ' + (net >= 0 ? 'plus' : 'minus');
+
+  document.getElementById('res-bet-pick').textContent = `${runStats.bet}₽ / ${PICK_DEFS[runStats.startTier].name}`;
+  document.getElementById('res-final-pick').textContent = PICK_DEFS[pick.tier].name;
+  document.getElementById('res-earned').textContent = `${fmtMoney(runStats.earned)} ₽`;
+  document.getElementById('res-ores-1').textContent = `${runStats.copper} / ${runStats.iron} / ${runStats.gold}`;
+  document.getElementById('res-ores-2').textContent = `${runStats.diamond} / ${runStats.emerald} / ${runStats.chests}`;
+  document.getElementById('res-depth').textContent = `${runStats.maxDepth}м`;
+
+  document.getElementById('result-overlay').classList.add('active');
+}
+
+function backToLobby() {
+  document.getElementById('result-overlay').classList.remove('active');
+  document.getElementById('lobby-overlay').classList.add('active');
+  mode = 'lobby';
+  syncLobbyUI();
+}
+
+// ================= PHYSICS UPDATE =================
+function update(dt) {
+  if (mode !== 'playing' || isPaused) return;
+
+  if (pick.giantTimer > 0) pick.giantTimer = Math.max(0, pick.giantTimer - dt);
+  if (shakeTime > 0) shakeTime = Math.max(0, shakeTime - dt);
+
+  for (let i = pendingTNT.length - 1; i >= 0; i--) {
+    pendingTNT[i].timer -= dt;
+    if (pendingTNT[i].timer <= 0) {
+      const item = pendingTNT.splice(i, 1)[0];
+      detonateTNT(item.c, item.r);
+      if (mode !== 'playing') return;
+    }
+  }
+
+  pick.vy += 26.0 * dt;
+  pick.vy = Math.max(-18, Math.min(15, pick.vy));
+  pick.vx *= Math.pow(0.92, dt * 60 * 0.08);
+
+  pick.x += pick.vx * dt;
+  pick.y += pick.vy * dt;
+  pick.angle += pick.vAngle * (dt * 60);
+
+  const isGiant = pick.giantTimer > 0;
+  const scale = isGiant ? 3.0 : 1.0;
+  const radius = 0.46 * scale;
+
+  if (pick.x - radius < 1) {
+    pick.x = 1 + radius;
+    pick.vx = Math.abs(pick.vx) * 0.8 + 2.4;
+    pick.vAngle = Math.abs(pick.vAngle);
+    playSound('bedrock');
+  } else if (pick.x + radius > COLS - 1) {
+    pick.x = COLS - 1 - radius;
+    pick.vx = -Math.abs(pick.vx) * 0.8 - 2.4;
+    pick.vAngle = -Math.abs(pick.vAngle);
+    playSound('bedrock');
+  }
+  if (pick.y - radius < 1) {
+    pick.y = 1 + radius;
+    pick.vy = Math.abs(pick.vy) * 0.6 + 1.8;
+    playSound('bedrock');
+  }
+
+  for (const [k, t] of hitCooldowns.entries()) {
+    if (t - dt <= 0) hitCooldowns.delete(k);
+    else hitCooldowns.set(k, t - dt);
+  }
+
+  const minC = Math.max(0, Math.floor(pick.x - radius));
+  const maxC = Math.min(COLS - 1, Math.floor(pick.x + radius));
+  const minR = Math.max(0, Math.floor(pick.y - radius));
+  const maxR = Math.floor(pick.y + radius);
+
+  ensureRowsGenerated(maxR + 24);
+
+  let bounced = false;
+  const hitCd = isGiant ? 0.13 : 0.17;
+
+  for (let r = minR; r <= maxR; r++) {
+    for (let c = minC; c <= maxC; c++) {
+      const bType = getBlock(c, r);
+      if (bType === B_EMPTY) continue;
+
+      const closestX = Math.max(c, Math.min(pick.x, c + 1));
+      const closestY = Math.max(r, Math.min(pick.y, r + 1));
+      const dx = pick.x - closestX;
+      const dy = pick.y - closestY;
+
+      if (dx * dx + dy * dy < radius * radius) {
+        const key = `${c},${r}`;
+        let broken = false;
+        if (!hitCooldowns.has(key)) {
+          hitCooldowns.set(key, hitCd);
+          broken = hitBlock(c, r, bType, dx, dy);
+          if (mode !== 'playing') return;
+        }
+
+        if (bType === B_EMERALD && !broken) {
+          bounced = true;
+          if (Math.abs(dx) > Math.abs(dy)) {
+            pick.x += dx > 0 ? 0.12 : -0.12;
+          } else {
+            pick.y = dy <= 0 ? (r - radius - 0.04) : (r + 1 + radius + 0.04);
+          }
+        } else if (bType !== B_SLIME && bType !== B_TNT && bType !== B_GIANT && bType !== B_CRAFT && bType !== B_CHEST && !bounced) {
+          bounced = true;
+          if (Math.abs(dx) > Math.abs(dy)) {
+            pick.vx = (dx > 0 ? 1 : -1) * (Math.abs(pick.vx) * 0.68 + 2.6);
+            if (!broken) pick.x += dx > 0 ? 0.07 : -0.07;
+          } else {
+            if (dy <= 0) {
+              const extraUp = Math.random() < 0.09 ? 3.2 : 0;
+              pick.vy = -(4.1 + Math.random() * 1.7 + extraUp);
+              pick.vx += (Math.random() - 0.5) * 4.8;
+              if (!broken) pick.y = r - radius - 0.02;
+            } else {
+              pick.vy = Math.abs(pick.vy) * 0.55 + 1.6;
+              if (!broken) pick.y = r + 1 + radius + 0.02;
+            }
+          }
+          pick.vAngle = (Math.random() < 0.5 ? -1 : 1) * (0.14 + Math.random() * 0.12);
+        }
+      }
+    }
+  }
+
+  const depth = Math.max(0, Math.floor(pick.y) - 3);
+  if (depth > runStats.maxDepth) {
+    runStats.maxDepth = depth;
+    if (depth >= 150 && !runStats.reachedDeepslate) {
+      runStats.reachedDeepslate = true;
+      showToast('🌑 ГЛУБИННЫЙ СЛАНЕЦ (150м)! ПРОЧНОСТЬ ×1.7!', '#b8b8d1');
+    }
+  }
+
+  const targetCamY = Math.max(0, pick.y * BLOCK_SIZE - canvas.height * 0.42);
+  cameraY += (targetCamY - cameraY) * 0.12;
+
+  const cullRow = Math.floor(cameraY / BLOCK_SIZE) - 18;
+  for (const rKey of rowsMap.keys()) {
+    if (rKey > 0 && rKey < cullRow) {
+      rowsMap.delete(rKey);
+      dmgMap.delete(rKey);
+    }
+  }
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 14 * dt; p.life -= dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const ft = floatingTexts[i];
+    ft.y += ft.vy * dt; ft.life -= dt;
+    if (ft.life <= 0) floatingTexts.splice(i, 1);
+  }
+  for (let i = explosionsFx.length - 1; i >= 0; i--) {
+    const ex = explosionsFx[i];
+    ex.life -= dt;
+    ex.radius = ex.maxRadius * (1 - ex.life / ex.maxLife);
+    if (ex.life <= 0) explosionsFx.splice(i, 1);
+  }
+}
+
+// ================= RENDER =================
+function drawOuterBackground() {
+  const tilePx = BLOCK_SIZE * OUTER_TILES_N;
+  const scrollY = -Math.floor((cameraY * 0.35) % tilePx);
+
+  for (let y = scrollY - tilePx; y < canvas.height + tilePx; y += tilePx) {
+    for (let x = 0; x < canvas.width + tilePx; x += tilePx) {
+      ctx.drawImage(OUTER_BG, x, y, tilePx, tilePx);
+    }
+  }
+
+  const camDepth = Math.max(0, (cameraY / BLOCK_SIZE) - 3);
+  if (camDepth > 135) {
+    const darkAlpha = Math.min(0.45, ((camDepth - 135) / 25) * 0.45);
+    ctx.fillStyle = `rgba(10, 10, 18, ${darkAlpha})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  const shaftW = COLS * BLOCK_SIZE;
+  const leftGrad = ctx.createLinearGradient(shaftOffsetX - 36, 0, shaftOffsetX, 0);
+  leftGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  leftGrad.addColorStop(1, 'rgba(0,0,0,0.65)');
+  ctx.fillStyle = leftGrad;
+  ctx.fillRect(shaftOffsetX - 36, 0, 36, canvas.height);
+
+  const rightGrad = ctx.createLinearGradient(shaftOffsetX + shaftW, 0, shaftOffsetX + shaftW + 36, 0);
+  rightGrad.addColorStop(0, 'rgba(0,0,0,0.65)');
+  rightGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = rightGrad;
+  ctx.fillRect(shaftOffsetX + shaftW, 0, 36, canvas.height);
+}
+
+function draw() {
+  ctx.imageSmoothingEnabled = false;
+  drawOuterBackground();
+
+  ctx.save();
+  if (shakeTime > 0 && !isPaused) {
+    ctx.translate((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
+  }
+  ctx.translate(shaftOffsetX, -Math.floor(cameraY));
+
+  const startR = Math.max(0, Math.floor(cameraY / BLOCK_SIZE) - 1);
+  const endR = Math.ceil((cameraY + canvas.height) / BLOCK_SIZE) + 2;
+  ensureRowsGenerated(endR + 6);
+
+  for (let r = startR; r <= endR; r++) {
+    const row = rowsMap.get(r);
+    if (!row) continue;
+    const by = r * BLOCK_SIZE;
+
+    for (let c = 0; c < COLS; c++) {
+      const bx = c * BLOCK_SIZE;
+      const t = row[c];
+
+      if (t === B_EMPTY) {
+        ctx.drawImage(getInnerBgTile(c, r), bx, by, BLOCK_SIZE, BLOCK_SIZE);
+        continue;
+      }
+
+      if (t === B_SLIME) {
+        ctx.drawImage(getInnerBgTile(c, r), bx, by, BLOCK_SIZE, BLOCK_SIZE);
+      }
+
+      const tex = BLOCK_TEX_MAP[t];
+      if (tex) ctx.drawImage(tex, bx, by, BLOCK_SIZE, BLOCK_SIZE);
+
+      if (t === B_CRAFT) {
+        ctx.strokeStyle = 'rgba(255, 223, 89, 0.72)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(bx + 1, by + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+      } else if (t === B_EMERALD) {
+        ctx.strokeStyle = 'rgba(125, 245, 165, 0.85)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(bx + 1, by + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+      } else if (t === B_CHEST) {
+        ctx.strokeStyle = 'rgba(255, 209, 102, 0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(bx + 1, by + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+      }
+
+      const dmg = getDmg(c, r);
+      if (dmg > 0.01) {
+        const stage = Math.min(7, Math.floor(dmg * 8));
+        ctx.drawImage(TEX.cracks[stage], bx, by, BLOCK_SIZE, BLOCK_SIZE);
+      }
+    }
+  }
+
+  for (const ex of explosionsFx) {
+    const alpha = ex.life / ex.maxLife;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.78;
+    ctx.fillStyle = '#ff9f1c';
+    ctx.beginPath();
+    ctx.arc(ex.x * BLOCK_SIZE, ex.y * BLOCK_SIZE, ex.radius * BLOCK_SIZE, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(ex.x * BLOCK_SIZE, ex.y * BLOCK_SIZE, ex.radius * BLOCK_SIZE * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  if (mode === 'playing' || mode === 'result') {
+    const isGiant = pick.giantTimer > 0;
+    const drawSize = BLOCK_SIZE * (isGiant ? 3.0 : 1.0);
+    const px = pick.x * BLOCK_SIZE;
+    const py = pick.y * BLOCK_SIZE;
+
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(pick.angle);
+    if (isGiant) {
+      ctx.shadowColor = '#c77dff';
+      ctx.shadowBlur = 20;
+    } else if (pick.tier === 'gold' || pick.tier === 'diamond') {
+      ctx.shadowColor = PICK_DEFS[pick.tier].color;
+      ctx.shadowBlur = 14;
+    }
+    ctx.drawImage(PICK_DEFS[pick.tier].tex, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+    ctx.restore();
+
+    const hpY = py - drawSize * 0.54 - 6;
+    ctx.font = 'bold 14px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    const hpStr = `❤️ ${Math.ceil(pick.hp)}/${pick.maxHp}`;
+    ctx.fillStyle = '#000';
+    ctx.fillText(hpStr, px + 1.5, hpY + 1.5);
+    ctx.fillStyle = PICK_DEFS[pick.tier].color;
+    ctx.fillText(hpStr, px, hpY);
+  }
+
+  for (const p of particles) {
+    ctx.fillStyle = p.color;
+    const s = p.size * BLOCK_SIZE;
+    ctx.fillRect(p.x * BLOCK_SIZE - s / 2, p.y * BLOCK_SIZE - s / 2, s, s);
+  }
+
+  for (const ft of floatingTexts) {
+    ctx.font = `bold ${ft.size}px "Courier New", monospace`;
+    ctx.textAlign = 'center';
+    const fx = ft.x * BLOCK_SIZE;
+    const fy = ft.y * BLOCK_SIZE;
+    ctx.fillStyle = '#000';
+    ctx.fillText(ft.text, fx + 1.5, fy + 1.5);
+    ctx.fillStyle = ft.color;
+    ctx.fillText(ft.text, fx, fy);
+  }
+
+  ctx.restore();
+}
+
+// ================= MAIN LOOP =================
+let lastTime = performance.now();
+function loop(now) {
+  const dt = Math.min(0.04, (now - lastTime) / 1000);
+  lastTime = now;
+
+  if (mode === 'playing' && !isPaused) {
+    for (let s = 0; s < gameSpeed; s++) {
+      update(dt);
+      if (mode !== 'playing') break;
+    }
+    if (mode === 'playing') updateHUD();
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+
+initPreviewShaft();
+syncLobbyUI();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
